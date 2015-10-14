@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <link href='https://fonts.googleapis.com/css?family=Roboto' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+</head>
+<title>Google Chord Diagram</title>
+<style>
+body{
+    font-family: 'Roboto', sans-serif;
+    pointer-events: all;
+    font-size:20px;
+}
+#round circle {
+    fill: none;
+}
+path.chord {
+    stroke: #c4c3c1;
+    stroke-width: .25px;
+    opacity: 0.8;
+}
+path.fade {
+    -webkit-transition: opacity 0.2s;
+    -moz-transition: opacity 0.2s;
+    -ms-transition:opacity 0.2s;
+    transition: opacity 0.2s;
+    opacity:0; 
+}
+
+#reset{
+    padding-left: 2px;
+    line-height: 12px;
+    background-color: white;
+    margin-left:20px;
+    margin-top: 10px;
+}
+a:hover{
+    cursor:pointer;
+}
+</style>
+
+<body>
+
+    <div class="bs-example">
+    <ul class="nav nav-pills" role="tablist">
+      </li>
+      <li role="presentation" class="active" id="reset"><a data-target="#">Reset</a></li>
+    </ul> 
+    </div> 
+
+    <div id="graphic"></div>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://d3js.org/queue.v1.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script>
+
+    function drawGraphic() {
+        var width = 720,
+            height = 720,
+            outerRadius = Math.min(width, height) / 2 - 60,
+            innerRadius = outerRadius - 25;
+        
+        var arc = d3.svg.arc()
+            .innerRadius(innerRadius)
+            .outerRadius(outerRadius);
+        
+        var layout = d3.layout.chord()
+            .padding(.04)
+            .sortSubgroups(d3.descending);
+        
+        var path = d3.svg.chord()
+            .radius(innerRadius - 5);
+        
+        var svg = d3.select("#graphic").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .call(responsivefy)
+            .append("g")
+            .attr("id", "round")
+            .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+
+       var circle = svg.append("circle")
+            .attr("r", outerRadius);
+        
+       queue()
+        .defer(d3.json, "1013Matrix.json")
+        .defer(d3.csv, "1013Colors.csv")
+        .defer(d3.json, "1013Rank.json")
+        .await(ready);
+
+       function ready(error, matrix, candidates, rank) {
+                
+                layout.matrix(matrix);
+                // create a group for each candidate
+                var group = svg.selectAll(".group")
+                    .data(layout.groups)
+                    .enter().append("g")
+                    .attr("class", "group")
+                    .attr("id", function(d, i) {
+                        return "candidate" + i;
+                    })
+                    .on("mouseover", mouseover);
+                    // .on("mouseout",mouseout);               
+                // Add the group arc for each candidate
+                var groupPath = group.append("path")
+                    .attr("class", "groupPath") 
+                    .attr("id", function(d, i) {
+                        return "group" + i;
+                    })
+                    .attr("d", arc)
+                    .style("fill", function(d, i) {
+                        return candidates[i].color;
+                    })
+                    .style("opacity",".8");
+                
+                // Add the name of each candidate
+                var groupText = group.append("text")
+                    .attr("dx", "140")
+                    .attr("dy","-20")
+                    .style("text-anchor", "middle")
+                    .attr("id","text");
+                    
+                groupText.append("textPath")
+                    .attr("xlink:href", function(d, i) { return "#group" + i; })
+                    .text(function(d, i) { return candidates[i].name; })
+                    .style("fill", function(d, i) { return candidates[i].color; });
+                   
+                //Add ticks to show percentage
+                var ticks = svg.append("g").selectAll("g")
+                    .data(layout.groups)
+                    .enter().append("g").selectAll("g")
+                    .data(groupTicks)
+                    .enter().append("g")
+                    .attr("transform", function(d) {
+                        return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")" + "translate(" + outerRadius + ",0)";
+                    });
+                ticks.append("line")
+                    .attr("x1", 1)
+                    .attr("y1", 0)
+                    .attr("x2", 5)
+                    .attr("y2", 0)
+                    .style("stroke", "#c4c3c1");
+                function groupTicks(d) {
+                    var k = (d.endAngle - d.startAngle) / d.value;
+                    return d3.range(0, d.value, 10).map(function(v, i) {
+                        return {
+                            angle: v * k + d.startAngle
+                        };
+                    });
+                }
+                //Add the chords.
+                var chord = svg.selectAll(".chord")
+                    .data(layout.chords)
+                    .enter().append("path")
+                    .attr("class", "chord")
+                    .style("fill", function(d) {
+                        return candidates[d.source.index].color;
+                    })
+                    .attr("d", path);
+                    
+                   
+                //Add the mouseover interactive action 
+                function mouseover(d, i) {
+                    svg.selectAll("text")
+                        .remove();
+                    chord.classed("fade", function(p) {
+                        return p.source.index != i && p.target.index != i;
+                    });
+                    
+                    // get the name of the candidate the user hovered over on
+                    var thisCandidate = $(this).attr('id'); 
+                    svg.selectAll(".chord")
+                    .transition()
+                    .duration(100)
+                    .style("fill", function(d,i){
+                        var x = 0; 
+                        for (x = 0; x <= 5; x ++ ){
+                            if (thisCandidate == "candidate" + x){
+                                return candidates[x].color;
+                            }                             
+                        }
+                    });
+                    var groupText = group.append("text")
+                    .attr("dx", "140")
+                    .attr("dy","-20")
+                    .style("text-anchor", "middle");
+                    groupText.append("textPath")
+                    .attr("xlink:href", function(d, i) { return "#group" + i; })
+                    .text(function(d, i, j) {
+                        var y = 0; 
+                        for (y = 0; y <= 5; y ++ ){
+                            
+                            if (thisCandidate == "candidate" + y){
+                                if (rank[i][y] === 0){
+                                    return candidates[i].name;
+                                } else {
+                                    return rank[i][y] + "." + candidates[i].name;}
+                                }
+                                
+                            }     
+                    })       
+                    .style("fill", function(d, i) { return candidates[i].color; });
+                 
+                };
+
+    
+        };
+        function responsivefy(svg) {
+            var container = d3.select(svg.node().parentNode),
+                width = parseInt(svg.style("width")),
+                height = parseInt(svg.style("height")),
+                aspect = width/height;
+            svg.attr("viewBox", "0 0 " + width + " " + height)
+                .attr("perserveAspectRatio", "xMinYMid")
+                .call(resize);
+            d3.select(window).on("resize." + container.attr("#graphic"), resize);
+            function resize() {
+                var targetWidth = parseInt(container.style("width"));
+                svg.attr("width", targetWidth);
+                svg.attr("height", Math.round(targetWidth / aspect * 0.5));
+            }
+        }
+    }
+    </script>
+</body>
+
+    <script>
+    drawGraphic()
+    d3.select("#reset")
+    .on("click", function(){
+      location.reload()
+    })
+    </script>
