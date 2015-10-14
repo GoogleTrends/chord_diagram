@@ -57,7 +57,7 @@ a:hover{
 
     function drawGraphic() {
         var width = 720,
-            height = 570,
+            height = 720,
             outerRadius = Math.min(width, height) / 2 - 60,
             innerRadius = outerRadius - 25;
         
@@ -218,7 +218,7 @@ a:hover{
             function resize() {
                 var targetWidth = parseInt(container.style("width"));
                 svg.attr("width", targetWidth);
-                svg.attr("height", Math.round(targetWidth / aspect * 0.5));
+                svg.attr("height", Math.round(targetWidth / aspect * 0.4));
             }
         }
     }
